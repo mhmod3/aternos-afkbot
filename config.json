@@ -1,5 +1,5 @@
 {
-  "ip": "fucking-server.aternos.me",
-  "port": 26484,
-  "version": "1.16.5"
+	"ip":"fucking-server.aternos.me",
+	"port": "26484",
+	"name": "fuckingbot"
 }
