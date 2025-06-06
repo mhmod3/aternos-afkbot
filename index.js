@@ -1,71 +1,109 @@
-const mineflayer = require('mineflayer')
+const mineflayer = require('mineflayer');
 const fs = require('fs');
-const express = require('express'); // إضافة Express
+const express = require('express');
 
-// إعداد express لتشغيل سيرفر على البورت
 const app = express();
 const PORT = process.env.PORT || 3000;
 app.get('/', (req, res) => res.send('Bot is alive!'));
 app.listen(PORT, () => console.log(`Web server running on port ${PORT}`));
 
-// تحميل بيانات الاتصال
+// إعداد المتغيرات العامة
 let rawdata = fs.readFileSync('config.json');
-let data = JSON.parse(rawdata);
+let config = JSON.parse(rawdata);
+let host = config["ip"];
+let port = config["port"];
 
-var lasttime = -1;
-var moving = 0;
-var connected = 0;
-var actions = ['forward', 'back', 'left', 'right'];
-var lastaction;
-var pi = 3.14159;
-var moveinterval = 2; // 2 second movement interval
-var maxrandom = 5; // 0-5 seconds added to movement interval (randomly)
-var host = data["ip"];
-var port = data["port"];
-var username = data["name"];
+const pi = 3.14159;
+const actions = ['forward', 'back', 'left', 'right'];
+const moveinterval = 2; // ثواني
+const maxrandom = 5;
 
-var bot = mineflayer.createBot({
-  host: host,
-  port: port,
-  username: username
-});
+let bot;
+let connected = 0;
+let moving = 0;
+let lasttime = -1;
+let lastaction;
 
-function getRandomArbitrary(min, max) {
-  return Math.random() * (max - min) + min;
+// توليد اسم عشوائي
+function generateRandomName() {
+  const chars = 'abcdefghijklmnopqrstuvwxyz0123456789';
+  let name = 'Bot_';
+  for (let i = 0; i < 6; i++) {
+    name += chars.charAt(Math.floor(Math.random() * chars.length));
+  }
+  return name;
 }
 
-bot.on('login', function () {
-  console.log("Logged In");
-});
+// بدء البوت
+function startBot() {
+  const username = generateRandomName();
+  bot = mineflayer.createBot({ host, port, username });
 
-bot.on('spawn', function () {
-  connected = 1;
-});
+  console.log(`🚀 بدء البوت باسم: ${username}`);
 
-bot.on('time', function () {
-  if (connected < 1) return;
+  bot.on('login', () => {
+    console.log(`✅ Logged in as ${username}`);
+  });
 
-  if (lasttime < 0) {
-    lasttime = bot.time.age;
-  } else {
-    var randomadd = Math.random() * maxrandom * 20;
-    var interval = moveinterval * 20 + randomadd;
+  bot.on('spawn', () => {
+    connected = 1;
+    console.log('🌍 Spawned in the world');
 
-    if (bot.time.age - lasttime > interval) {
-      if (moving == 1) {
-        bot.setControlState(lastaction, false);
-        moving = 0;
+    // حركة عشوائية، نظر وضرب
+    setInterval(() => {
+      if (!connected) return;
+
+      const randomAdd = Math.random() * maxrandom * 20;
+      const interval = moveinterval * 20 + randomAdd;
+
+      if (bot.time.age - lasttime > interval) {
+        if (moving === 1) {
+          bot.setControlState(lastaction, false);
+          moving = 0;
+        } else {
+          const yaw = Math.random() * pi - (0.5 * pi);
+          const pitch = Math.random() * pi - (0.5 * pi);
+          bot.look(yaw, pitch, false);
+          lastaction = actions[Math.floor(Math.random() * actions.length)];
+          bot.setControlState(lastaction, true);
+          bot.activateItem(); // تفعيل اليد
+          bot.swingArm(); // الضرب (محاولة كسر)
+          moving = 1;
+        }
         lasttime = bot.time.age;
-      } else {
-        var yaw = Math.random() * pi - (0.5 * pi);
-        var pitch = Math.random() * pi - (0.5 * pi);
-        bot.look(yaw, pitch, false);
-        lastaction = actions[Math.floor(Math.random() * actions.length)];
-        bot.setControlState(lastaction, true);
-        moving = 1;
-        lasttime = bot.time.age;
-        bot.activateItem();
       }
-    }
-  }
-});
+    }, 1000);
+  });
+
+  // إعادة التشغيل عند الطرد أو انتهاء الاتصال
+  const restart = (reason) => {
+    connected = 0;
+    console.log(`🔄 إعادة الاتصال خلال 10 ثوانٍ...`, reason ? `(${reason})` : '');
+    setTimeout(() => {
+      startBot();
+    }, 10000);
+  };
+
+  bot.on('kicked', (reason) => {
+    console.log('❌ تم طرد البوت:', reason);
+    restart(reason);
+  });
+
+  bot.on('end', () => {
+    console.log('⚠️ الاتصال انقطع.');
+    restart();
+  });
+
+  bot.on('error', (err) => {
+    console.log('💥 خطأ:', err.message);
+    restart(err.message);
+  });
+
+  // تغيير الاسم كل ساعة
+  setTimeout(() => {
+    console.log('⏳ تغيير الاسم بعد ساعة...');
+    if (bot) bot.quit();
+  }, 60 * 60 * 1000); // 1 ساعة
+}
+
+startBot();
