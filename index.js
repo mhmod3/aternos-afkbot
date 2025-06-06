@@ -5,17 +5,17 @@ const express = require('express');
 const app = express();
 const PORT = process.env.PORT || 3000;
 app.get('/', (req, res) => res.send('Bot is alive!'));
-app.listen(PORT, () => console.log(`Web server running on port ${PORT}`));
+app.listen(PORT, () => console.log(`🌐 Web server running on port ${PORT}`));
 
-// إعداد المتغيرات العامة
-let rawdata = fs.readFileSync('config.json');
-let config = JSON.parse(rawdata);
+// تحميل الإعدادات من config.json
+let config = JSON.parse(fs.readFileSync('config.json'));
 let host = config["ip"];
 let port = config["port"];
+let mcVersion = config["version"];
 
 const pi = 3.14159;
 const actions = ['forward', 'back', 'left', 'right'];
-const moveinterval = 2; // ثواني
+const moveinterval = 2;
 const maxrandom = 5;
 
 let bot;
@@ -34,10 +34,15 @@ function generateRandomName() {
   return name;
 }
 
-// بدء البوت
+// تشغيل البوت
 function startBot() {
   const username = generateRandomName();
-  bot = mineflayer.createBot({ host, port, username });
+  bot = mineflayer.createBot({
+    host,
+    port,
+    username,
+    version: mcVersion
+  });
 
   console.log(`🚀 بدء البوت باسم: ${username}`);
 
@@ -49,7 +54,7 @@ function startBot() {
     connected = 1;
     console.log('🌍 Spawned in the world');
 
-    // حركة عشوائية، نظر وضرب
+    // الحركة والضرب العشوائي
     setInterval(() => {
       if (!connected) return;
 
@@ -64,10 +69,12 @@ function startBot() {
           const yaw = Math.random() * pi - (0.5 * pi);
           const pitch = Math.random() * pi - (0.5 * pi);
           bot.look(yaw, pitch, false);
+
           lastaction = actions[Math.floor(Math.random() * actions.length)];
           bot.setControlState(lastaction, true);
-          bot.activateItem(); // تفعيل اليد
-          bot.swingArm(); // الضرب (محاولة كسر)
+
+          bot.activateItem();  // استخدام اليد
+          bot.swingArm();      // ضرب
           moving = 1;
         }
         lasttime = bot.time.age;
@@ -75,7 +82,7 @@ function startBot() {
     }, 1000);
   });
 
-  // إعادة التشغيل عند الطرد أو انتهاء الاتصال
+  // إعادة الاتصال عند الطرد أو انتهاء الجلسة
   const restart = (reason) => {
     connected = 0;
     console.log(`🔄 إعادة الاتصال خلال 10 ثوانٍ...`, reason ? `(${reason})` : '');
@@ -103,7 +110,7 @@ function startBot() {
   setTimeout(() => {
     console.log('⏳ تغيير الاسم بعد ساعة...');
     if (bot) bot.quit();
-  }, 60 * 60 * 1000); // 1 ساعة
+  }, 60 * 60 * 1000);
 }
 
 startBot();
